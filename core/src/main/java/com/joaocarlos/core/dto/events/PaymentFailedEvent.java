@@ -24,11 +24,11 @@ public class PaymentFailedEvent {
         this.orderId = orderId;
     }
 
-    public UUID getProdudctId() {
+    public UUID getProductId() {
         return productId;
     }
 
-    public void setProdudctId(UUID productId) {
+    public void setProductId(UUID productId) {
         this.productId = productId;
     }
 
