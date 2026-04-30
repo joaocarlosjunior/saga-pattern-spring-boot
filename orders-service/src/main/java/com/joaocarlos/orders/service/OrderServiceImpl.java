@@ -1,13 +1,17 @@
 package com.joaocarlos.orders.service;
 
 import com.joaocarlos.core.dto.Order;
+import com.joaocarlos.core.dto.events.OrderCreatedEvent;
 import com.joaocarlos.core.types.OrderStatus;
 import com.joaocarlos.orders.dao.jpa.entity.OrderEntity;
 import com.joaocarlos.orders.dao.jpa.repository.OrderRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
-import com.joaocarlos.core.dto.events.OrderCreatedEvent;
+import org.springframework.util.Assert;
+import com.joaocarlos.core.dto.events.OrderApprovedEvent;
+
+import java.util.UUID;
 
 @Service
 public class OrderServiceImpl implements OrderService {
@@ -16,7 +20,7 @@ public class OrderServiceImpl implements OrderService {
     private final String ordersEventsTopicName;
 
     public OrderServiceImpl(OrderRepository orderRepository,
-                            KafkaTemplate kafkaTemplate,
+                            KafkaTemplate<String, Object> kafkaTemplate,
                             @Value("${orders.events.topic.name}") String ordersEventsTopicName) {
         this.orderRepository = orderRepository;
         this.kafkaTemplate = kafkaTemplate;
@@ -47,6 +51,20 @@ public class OrderServiceImpl implements OrderService {
                 entity.getProductId(),
                 entity.getProductQuantity(),
                 entity.getStatus());
+    }
+
+    @Override
+    public void approveOrder(UUID orderId) {
+        OrderEntity orderEntity = orderRepository.findById(orderId).orElse(null);
+        Assert.notNull(orderEntity, "Nenhum pedido encontrado com id: " + orderId);
+
+        orderEntity.setStatus(OrderStatus.APPROVED);
+
+        orderRepository.save(orderEntity);
+
+        OrderApprovedEvent orderApprovedEvent = new OrderApprovedEvent(orderId);
+
+        kafkaTemplate.send(ordersEventsTopicName, orderApprovedEvent);
     }
 
 }
