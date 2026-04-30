@@ -4,6 +4,7 @@ import com.joaocarlos.core.dto.Product;
 import com.joaocarlos.core.dto.commands.ReserveProductCommand;
 import com.joaocarlos.core.dto.events.ProductReservationFailedEvent;
 import com.joaocarlos.core.dto.events.ProductReservedEvent;
+import com.joaocarlos.products.dao.jpa.repository.ProductRepository;
 import com.joaocarlos.products.service.ProductService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,6 +14,8 @@ import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Component;
+import com.joaocarlos.core.dto.commands.CancelProductReservationCommand;
+import com.joaocarlos.core.dto.events.ProductReservationCancelledEvent;
 
 @Component
 @KafkaListener(topics = {"${products.commands.topic.name}"})
@@ -21,13 +24,16 @@ public class ProductCommandsHandler {
     private final Logger logger = LoggerFactory.getLogger(this.getClass());
     private final KafkaTemplate<String, Object> kafkaTemplate;
     private final String productEventsTopicName;
+    private final ProductRepository productRepository;
 
     public ProductCommandsHandler(ProductService productService,
                                   KafkaTemplate<String, Object> kafkaTemplate,
-                                  @Value("${products.events.topic.name}") String productEventsTopicName) {
+                                  @Value("${products.events.topic.name}") String productEventsTopicName,
+                                  ProductRepository productRepository) {
         this.productService = productService;
         this.kafkaTemplate = kafkaTemplate;
         this.productEventsTopicName = productEventsTopicName;
+        this.productRepository = productRepository;
     }
 
     @KafkaHandler
@@ -53,7 +59,22 @@ public class ProductCommandsHandler {
             );
             kafkaTemplate.send(productEventsTopicName, productReservationFailedEvent);
         }
+    }
 
+    @KafkaHandler
+    public void handleCommand(@Payload CancelProductReservationCommand cancelProductReservationCommand) {
+        Product productToCancel = new Product(
+                cancelProductReservationCommand.getProductId(),
+                cancelProductReservationCommand.getProductQuantity()
+        );
 
+        productService.cancelReservation(productToCancel, cancelProductReservationCommand.getOrderId());
+
+        ProductReservationCancelledEvent event = new ProductReservationCancelledEvent(
+                cancelProductReservationCommand.getProductId(),
+                cancelProductReservationCommand.getOrderId()
+        );
+
+        kafkaTemplate.send(productEventsTopicName, event);
     }
 }
