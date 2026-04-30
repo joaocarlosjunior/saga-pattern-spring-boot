@@ -1,6 +1,7 @@
 package com.joaocarlos.orders.saga;
 
 import com.joaocarlos.core.dto.commands.ApproveOrderCommand;
+import com.joaocarlos.core.dto.commands.CancelProductReservationCommand;
 import com.joaocarlos.core.dto.commands.ProcessPaymentCommand;
 import com.joaocarlos.core.dto.commands.ReserveProductCommand;
 import com.joaocarlos.core.dto.events.OrderCreatedEvent;
@@ -15,6 +16,7 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Component;
 import com.joaocarlos.core.dto.events.OrderApprovedEvent;
+import com.joaocarlos.core.dto.events.PaymentFailedEvent;
 
 @Component
 @KafkaListener(topics = {
@@ -74,5 +76,16 @@ public class OrderSaga {
     @KafkaHandler
     public void handleEvent(@Payload OrderApprovedEvent orderApprovedEvent) {
         orderHistoryService.add(orderApprovedEvent.getOrderId(), OrderStatus.APPROVED);
+    }
+
+    @KafkaHandler
+    public void handleEvent(@Payload PaymentFailedEvent paymentFailedEvent) {
+        CancelProductReservationCommand cancelProductReservationCommand = new CancelProductReservationCommand(
+                paymentFailedEvent.getProductId(),
+                paymentFailedEvent.getOrderId(),
+                paymentFailedEvent.getProductQuantity()
+        );
+
+        kafkaTemplate.send(productsCommandsTopicName, cancelProductReservationCommand);
     }
 }
