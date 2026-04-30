@@ -17,6 +17,8 @@ import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Component;
 import com.joaocarlos.core.dto.events.OrderApprovedEvent;
 import com.joaocarlos.core.dto.events.PaymentFailedEvent;
+import com.joaocarlos.core.dto.events.ProductReservationCancelledEvent;
+import com.joaocarlos.core.dto.commands.RejectOrderCommand;
 
 @Component
 @KafkaListener(topics = {
@@ -87,5 +89,14 @@ public class OrderSaga {
         );
 
         kafkaTemplate.send(productsCommandsTopicName, cancelProductReservationCommand);
+    }
+
+    @KafkaHandler
+    public void handleEvent(@Payload ProductReservationCancelledEvent event) {
+        RejectOrderCommand command = new RejectOrderCommand(event.getOrderId());
+
+        kafkaTemplate.send(orderCommandsTopicName, command);
+
+        orderHistoryService.add(event.getOrderId(), OrderStatus.REJECTED);
     }
 }
