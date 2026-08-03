@@ -1,0 +1,59 @@
+server:
+  port: 8080
+
+spring:
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: true
+  kafka:
+    bootstrap-servers: localhost:9092,localhost:9094,localhost:9096
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JacksonJsonSerializer
+      acks: all
+      properties:
+        delivery.timeout.ms: 120000
+        linger.ms: 0
+        request.timeout.ms: 30000
+        max.in.flight.requests.per.connection: 5
+        enable.idempotence: true
+    consumer:
+      group-id: orders-ms
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JacksonJsonDeserializer
+      properties:
+        spring.json.trusted.packages: "com.joaocarlos.core.*"
+  datasource:
+    url: jdbc:h2:mem:testdb
+    username: sa
+    password: password
+    driver-class-name: org.h2.Driver
+  h2:
+    console:
+      enabled: true
+
+orders:
+  events:
+    topic:
+      name: orders-events
+
+products:
+  commands:
+    topic:
+      name: products-commands
+  events:
+    topic:
+      name: products-events
+
+payments:
+  commands:
+    topic:
+      name: payments-commands
+  events:
+    topic:
+      name: payments-events
+
+order:
+  commands:
+    topic:
+      name: order-commands
