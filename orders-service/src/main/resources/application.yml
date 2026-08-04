@@ -1,7 +1,10 @@
 server:
   port: 8080
+  shutdown: immediate
 
 spring:
+  application:
+    name: orders-service
   jackson:
     deserialization:
       fail-on-unknown-properties: true
@@ -23,6 +26,10 @@ spring:
       value-deserializer: org.springframework.kafka.support.serializer.JacksonJsonDeserializer
       properties:
         spring.json.trusted.packages: "com.joaocarlos.core.*"
+    listener:
+      observation-enabled: true
+    template:
+      observation-enabled: true
   datasource:
     url: jdbc:h2:mem:testdb
     username: sa
@@ -57,3 +64,27 @@ order:
   commands:
     topic:
       name: order-commands
+
+management:
+  otlp:
+    metrics:
+      export:
+        url: http://localhost:4318/v1/metrics
+  opentelemetry:
+    tracing:
+      export:
+        otlp:
+          endpoint: http://localhost:4318/v1/traces
+    logging:
+      export:
+        otlp:
+          endpoint: http://localhost:4318/v1/logs
+  tracing:
+    sampling:
+      probability: 1.0
+
+logging:
+  level:
+    com.joaocarlos: INFO
+    org.springframework.boot.actuator.autoconfigure.opentelemetry: DEBUG
+    org.springframework.boot.docker.compose: DEBUG

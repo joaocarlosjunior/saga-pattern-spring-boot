@@ -1,7 +1,34 @@
 server:
   port: 8084
+  shutdown: immediate
 
 spring:
+  application:
+    name: credit-card-processor-service
   jackson:
     deserialization:
       fail-on-unknown-properties: true
+
+management:
+  otlp:
+    metrics:
+      export:
+        url: http://localhost:4318/v1/metrics
+  opentelemetry:
+    tracing:
+      export:
+        otlp:
+          endpoint: http://localhost:4318/v1/traces
+    logging:
+      export:
+        otlp:
+          endpoint: http://localhost:4318/v1/logs
+  tracing:
+    sampling:
+      probability: 1.0
+
+logging:
+  level:
+    com.joaocarlos: INFO
+    org.springframework.boot.actuator.autoconfigure.opentelemetry: DEBUG
+    org.springframework.boot.docker.compose: DEBUG

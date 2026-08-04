@@ -1,7 +1,10 @@
 server:
   port: 8082
+  shutdown: immediate
 
 spring:
+  application:
+    name: payments-service
   jackson:
     deserialization:
       fail-on-unknown-properties: true
@@ -27,6 +30,10 @@ spring:
       properties:
         spring.json.trusted.packages: "com.joaocarlos.core.*"
         allow.auto.create.topics: false
+    listener:
+      observation-enabled: true
+    template:
+      observation-enabled: true
 
 remote:
   ccp:
@@ -39,3 +46,27 @@ payments:
   events:
     topic:
       name: payments-events
+
+management:
+  otlp:
+    metrics:
+      export:
+        url: http://localhost:4318/v1/metrics
+  opentelemetry:
+    tracing:
+      export:
+        otlp:
+          endpoint: http://localhost:4318/v1/traces
+    logging:
+      export:
+        otlp:
+          endpoint: http://localhost:4318/v1/logs
+  tracing:
+    sampling:
+      probability: 1.0
+
+logging:
+  level:
+    com.joaocarlos: INFO
+    org.springframework.boot.actuator.autoconfigure.opentelemetry: DEBUG
+    org.springframework.boot.docker.compose: DEBUG

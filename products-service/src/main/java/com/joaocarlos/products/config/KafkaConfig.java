@@ -15,10 +15,6 @@ public class KafkaConfig {
     private final static Integer TOPIC_REPLICATION_FACTOR=3;
     private final static Integer TOPIC_PARTITIONS=3;
 
-    @Bean
-    KafkaTemplate<String, Object> kafkaTemplate(ProducerFactory<String, Object> producerFactory) {
-        return new KafkaTemplate<>(producerFactory);
-    }
 
     @Bean
     NewTopic createdProductsEventsTopic() {

@@ -1,7 +1,10 @@
 server:
   port: 8081
+  shutdown: immediate
 
 spring:
+  application:
+    name: products-service
   jackson:
     deserialization:
       fail-on-unknown-properties: true
@@ -27,6 +30,10 @@ spring:
       properties:
         spring.json.trusted.packages: "com.joaocarlos.core.*"
         allow.auto.create.topics: false
+    listener:
+      observation-enabled: true
+    template:
+      observation-enabled: true
 
 products:
   commands:
@@ -35,3 +42,27 @@ products:
   events:
     topic:
       name: products-events
+
+management:
+  otlp:
+    metrics:
+      export:
+        url: http://localhost:4318/v1/metrics
+  opentelemetry:
+    tracing:
+      export:
+        otlp:
+          endpoint: http://localhost:4318/v1/traces
+    logging:
+      export:
+        otlp:
+          endpoint: http://localhost:4318/v1/logs
+  tracing:
+    sampling:
+      probability: 1.0
+
+logging:
+  level:
+    com.joaocarlos: INFO
+    org.springframework.boot.actuator.autoconfigure.opentelemetry: DEBUG
+    org.springframework.boot.docker.compose: DEBUG
