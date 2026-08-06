@@ -255,8 +255,3 @@ Você pode inspecionar o estado dos dados em tempo real acessando os consoles H2
 - **JDBC URL**: `jdbc:h2:mem:testdb`
 - **User**: `sa`
 - **Password**: `password`
-
----
-
-*Diagrama ilustrativo do projeto:*
-![Saga Pattern Diagram](./images/saga-pattern-1.png)
