@@ -131,7 +131,8 @@ sequenceDiagram
 - **Spring Kafka** (Integração assíncrona baseada em eventos/comandos)
 - **H2 Database** (Persistência local relacional em memória para fins de estudo)
 - **Spring Data JPA**
-- **Docker & Docker Compose** (Para subir o cluster Kafka localmente)
+- **Docker & Docker Compose** (Para subir o cluster Kafka e Grafana LGTM localmente)
+- **Observabilidade**: OpenTelemetry Collector, Grafana LGTM(Loki, Grafana, Tempo, Mimir)
 
 ---
 
