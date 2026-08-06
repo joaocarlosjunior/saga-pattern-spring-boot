@@ -2,7 +2,11 @@
 
 Este repositório é um projeto de estudo prático para explorar a implementação do **Padrão Saga Baseado em Orquestração** (Saga Orchestration Pattern) utilizando o ecossistema do **Spring Boot** e **Apache Kafka** como mensageria assíncrona.
 
+## Desenho da Arquitetura
+
 ---
+
+<img width="772" height="704" alt="Image" src="https://github.com/user-attachments/assets/c74563a7-cd0c-40ae-8902-10fddd451a25" />
 
 ## 📖 O Padrão Saga
 
