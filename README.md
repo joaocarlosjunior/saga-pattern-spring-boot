@@ -49,7 +49,7 @@ O projeto é estruturado como um monorepo Maven composto pelos seguintes módulo
 ## 🔄 Fluxos da Saga
 
 ### 1. Caminho Feliz (Sucesso Completo)
-No caso em que todos os passos ocorrem com sucesso, o fluxo de comunicação segue a sequência abaixo:
+No caso em que todos os passos ocorrem com sucesso, o fluxo de comunicação orquestrado pelo `saga-orchestrator-service` segue a sequência abaixo:
 
 ```mermaid
 sequenceDiagram
@@ -59,33 +59,33 @@ sequenceDiagram
     Note over orders-service: Salva pedido como CREATED
     orders-service-->>Kafka (orders-events): OrderCreatedEvent
     
-    Note over orders-service (Saga): OrderSaga detecta OrderCreatedEvent
-    orders-service (Saga)-->>Kafka (products-commands): ReserveProductCommand
+    Note over saga-orchestrator-service: SagaOrchestrator detecta OrderCreatedEvent
+    saga-orchestrator-service-->>Kafka (products-commands): ReserveProductCommand
     
     Note over products-service: Recebe ReserveProductCommand
     Note over products-service: Reserva estoque do produto
     products-service-->>Kafka (products-events): ProductReservedEvent
     
-    Note over orders-service (Saga): OrderSaga detecta ProductReservedEvent
-    orders-service (Saga)-->>Kafka (payments-commands): ProcessPaymentCommand
+    Note over saga-orchestrator-service: SagaOrchestrator detecta ProductReservedEvent
+    saga-orchestrator-service-->>Kafka (payments-commands): ProcessPaymentCommand
     
     Note over payments-service: Recebe ProcessPaymentCommand
     payments-service->>credit-card-processor-service: POST /ccp/process (REST)
     Note over payments-service: Salva pagamento no banco local
     payments-service-->>Kafka (payments-events): PaymentProcessedEvent
     
-    Note over orders-service (Saga): OrderSaga detecta PaymentProcessedEvent
-    orders-service (Saga)-->>Kafka (order-commands): ApproveOrderCommand
+    Note over saga-orchestrator-service: SagaOrchestrator detecta PaymentProcessedEvent
+    saga-orchestrator-service-->>Kafka (order-commands): ApproveOrderCommand
     
     Note over orders-service: Recebe ApproveOrderCommand
     Note over orders-service: Atualiza pedido para APPROVED
     orders-service-->>Kafka (orders-events): OrderApprovedEvent
     
-    Note over orders-service (Saga): OrderSaga detecta OrderApprovedEvent e finaliza
+    Note over saga-orchestrator-service: SagaOrchestrator detecta OrderApprovedEvent e finaliza saga
 ```
 
 ### 2. Fluxo de Compensação (Rollback) por Falha de Pagamento
-Se o processamento do pagamento falhar (por exemplo, se o `credit-card-processor-service` estiver indisponível ou retornar erro), a transação é desfeita de forma reversa (compensação):
+Se o processamento do pagamento falhar (por exemplo, se o `credit-card-processor-service` estiver indisponível ou retornar erro), a transação é desfeita de forma reversa (compensação) sob coordenação do `saga-orchestrator-service`:
 
 ```mermaid
 sequenceDiagram
@@ -95,33 +95,54 @@ sequenceDiagram
     Note over orders-service: Salva pedido como CREATED
     orders-service-->>Kafka (orders-events): OrderCreatedEvent
     
-    Note over orders-service (Saga): OrderSaga envia ReserveProductCommand
-    orders-service (Saga)-->>Kafka (products-commands): ReserveProductCommand
+    Note over saga-orchestrator-service: SagaOrchestrator envia ReserveProductCommand
+    saga-orchestrator-service-->>Kafka (products-commands): ReserveProductCommand
     
     Note over products-service: Reserva estoque
     products-service-->>Kafka (products-events): ProductReservedEvent
     
-    Note over orders-service (Saga): OrderSaga envia ProcessPaymentCommand
-    orders-service (Saga)-->>Kafka (payments-commands): ProcessPaymentCommand
+    Note over saga-orchestrator-service: SagaOrchestrator envia ProcessPaymentCommand
+    saga-orchestrator-service-->>Kafka (payments-commands): ProcessPaymentCommand
     
     Note over payments-service: Tentativa de pagamento falha<br/>(Gateway offline / Timeout)
     payments-service-->>Kafka (payments-events): PaymentFailedEvent
     
-    Note over orders-service (Saga): OrderSaga detecta PaymentFailedEvent
-    orders-service (Saga)-->>Kafka (products-commands): CancelProductReservationCommand
+    Note over saga-orchestrator-service: SagaOrchestrator detecta PaymentFailedEvent
+    saga-orchestrator-service-->>Kafka (products-commands): CancelProductReservationCommand
     
     Note over products-service: Devolve o produto ao estoque (Compensação)
     products-service-->>Kafka (products-events): ProductReservationCancelledEvent
     
-    Note over orders-service (Saga): OrderSaga detecta ProductReservationCancelledEvent
-    orders-service (Saga)-->>Kafka (order-commands): RejectOrderCommand
+    Note over saga-orchestrator-service: SagaOrchestrator detecta ProductReservationCancelledEvent
+    saga-orchestrator-service-->>Kafka (order-commands): RejectOrderCommand
     
+    Note over orders-service: Recebe RejectOrderCommand
     Note over orders-service: Atualiza pedido para REJECTED
 ```
 
-> [!NOTE]
-> **Limitações conhecidas para estudo:**
-> O evento `ProductReservationFailedEvent` (disparado quando o produto não possui estoque suficiente no `products-service`) é publicado no tópico `products-events`, mas atualmente o `OrderSaga` não implementa o método `@KafkaHandler` para tratá-lo. Em um cenário real de produção, o orquestrador escutaria este evento e dispararia imediatamente um `RejectOrderCommand` para o `orders-service` marcar o pedido como `REJECTED`.
+### 3. Fluxo de Rejeição por Falha na Reserva de Produto (Estoque Insuficiente)
+Se a reserva de estoque no `products-service` falhar (por exemplo, quantidade insuficiente em estoque ou erro na validação), o `saga-orchestrator-service` capta o evento de falha e coordena o cancelamento direto do pedido:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Cliente
+    Cliente->>orders-service: POST /orders
+    Note over orders-service: Salva pedido como CREATED
+    orders-service-->>Kafka (orders-events): OrderCreatedEvent
+    
+    Note over saga-orchestrator-service: SagaOrchestrator envia ReserveProductCommand
+    saga-orchestrator-service-->>Kafka (products-commands): ReserveProductCommand
+    
+    Note over products-service: Tentativa de reserva falha<br/>(Estoque insuficiente)
+    products-service-->>Kafka (products-events): ProductReservationFailedEvent
+    
+    Note over saga-orchestrator-service: SagaOrchestrator detecta ProductReservationFailedEvent
+    saga-orchestrator-service-->>Kafka (order-commands): RejectOrderCommand
+    
+    Note over orders-service: Recebe RejectOrderCommand
+    Note over orders-service: Atualiza pedido para REJECTED
+```
 
 ---
 
