@@ -18,13 +18,16 @@ public class OrderServiceImpl implements OrderService {
     private final OrderRepository orderRepository;
     private final KafkaTemplate<String, Object> kafkaTemplate;
     private final String ordersEventsTopicName;
+    private final OrderHistoryService orderHistoryService;
 
     public OrderServiceImpl(OrderRepository orderRepository,
                             KafkaTemplate<String, Object> kafkaTemplate,
-                            @Value("${orders.events.topic.name}") String ordersEventsTopicName) {
+                            @Value("${orders.events.topic.name}") String ordersEventsTopicName,
+                            OrderHistoryService orderHistoryService) {
         this.orderRepository = orderRepository;
         this.kafkaTemplate = kafkaTemplate;
         this.ordersEventsTopicName = ordersEventsTopicName;
+        this.orderHistoryService = orderHistoryService;
     }
 
     @Override
@@ -35,6 +38,8 @@ public class OrderServiceImpl implements OrderService {
         entity.setProductQuantity(order.getProductQuantity());
         entity.setStatus(OrderStatus.CREATED);
         orderRepository.save(entity);
+
+        orderHistoryService.add(entity.getId(), OrderStatus.CREATED);
 
         OrderCreatedEvent orderCreatedEvent = new OrderCreatedEvent(
                 entity.getId(),
@@ -62,6 +67,8 @@ public class OrderServiceImpl implements OrderService {
 
         orderRepository.save(orderEntity);
 
+        orderHistoryService.add(orderId, OrderStatus.APPROVED);
+
         OrderApprovedEvent orderApprovedEvent = new OrderApprovedEvent(orderId);
 
         kafkaTemplate.send(ordersEventsTopicName, orderApprovedEvent);
@@ -75,6 +82,8 @@ public class OrderServiceImpl implements OrderService {
         orderEntity.setStatus(OrderStatus.REJECTED);
 
         orderRepository.save(orderEntity);
+
+        orderHistoryService.add(orderId, OrderStatus.REJECTED);
     }
 
 }

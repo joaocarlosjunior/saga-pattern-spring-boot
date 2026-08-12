@@ -13,7 +13,7 @@ Este repositório é um projeto de estudo prático para explorar a implementaç�
 Em arquiteturas de microsserviços, garantir a consistência dos dados entre múltiplos serviços sem o uso de transações distribuídas (que prejudicam o desempenho e a escalabilidade) é um grande desafio. O **Padrão Saga** resolve isso dividindo uma transação de negócios em uma série de transações locais em cada microsserviço.
 
 Neste repositório, foi adotada a abordagem de **Orquestração**:
-- O `orders-service` atua como o **Orquestrador da Saga** (`OrderSaga.java`).
+- O `saga-orchestrator-service` atua exclusivamente como o **Orquestrador da Saga** (`SagaOrchestrator.java`).
 - Ele escuta eventos publicados nos tópicos do Kafka e envia comandos de ação correspondentes para os outros microsserviços.
 - Se uma das etapas falhar, o orquestrador coordena a execução de **transações compensatórias** (rollback lógico) para desfazer os passos anteriores e restaurar a consistência dos dados.
 
@@ -26,12 +26,14 @@ O projeto é estruturado como um monorepo Maven composto pelos seguintes módulo
 1. **`core`**
    - Biblioteca compartilhada que define os modelos comuns, DTOs de comandos e eventos (ex: `OrderCreatedEvent`, `ReserveProductCommand`), enums (`OrderStatus`) e exceções customizadas.
 2. **`orders-service`** (Porta `8080`)
-   - Responsável pela criação de pedidos. Contém a lógica do Orquestrador (`OrderSaga.java`) e mantém a tabela de histórico de execução da saga.
-3. **`products-service`** (Porta `8081`)
+   - Responsável pela criação e manutenção de pedidos e mantém a tabela de histórico de execução.
+3. **`saga-orchestrator-service`** (Porta `8083`)
+   - Serviço dedicado exclusivamente a orquestrar o fluxo do padrão Saga (`SagaOrchestrator.java`).
+4. **`products-service`** (Porta `8081`)
    - Gerencia o estoque de produtos, processa a reserva de itens para novos pedidos e realiza o cancelamento da reserva (reposição de estoque) em caso de rollback.
-4. **`payments-service`** (Porta `8082`)
+5. **`payments-service`** (Porta `8082`)
    - Responsável pelo processamento de pagamentos. Integra-se via REST HTTP com o serviço externo de validação de cartões.
-5. **`credit-card-processor-service`** (Porta `8084`)
+6. **`credit-card-processor-service`** (Porta `8084`)
    - Um serviço mock que simula um gateway de pagamento (adquirente).
 
 ### 🏷️ Tópicos do Kafka Configurados
@@ -177,7 +179,11 @@ Execute cada microsserviço em terminais separados utilizando o plugin do Spring
    ```bash
    mvn spring-boot:run -pl payments-service
    ```
-4. **Orders Service (Orquestrador)**:
+4. **Saga Orchestrator Service**:
+   ```bash
+   mvn spring-boot:run -pl saga-orchestrator-service
+   ```
+5. **Orders Service**:
    ```bash
    mvn spring-boot:run -pl orders-service
    ```

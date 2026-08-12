@@ -1,10 +1,10 @@
 server:
-  port: 8080
+  port: 8083
   shutdown: immediate
 
 spring:
   application:
-    name: orders-service
+    name: saga-orchestrator-service
   jackson:
     deserialization:
       fail-on-unknown-properties: true
@@ -21,7 +21,7 @@ spring:
         max.in.flight.requests.per.connection: 5
         enable.idempotence: true
     consumer:
-      group-id: orders-ms
+      group-id: saga-orchestrator-ms
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JacksonJsonDeserializer
       properties:
@@ -30,19 +30,27 @@ spring:
       observation-enabled: true
     template:
       observation-enabled: true
-  datasource:
-    url: jdbc:h2:mem:testdb
-    username: sa
-    password: password
-    driver-class-name: org.h2.Driver
-  h2:
-    console:
-      enabled: true
 
 orders:
   events:
     topic:
       name: orders-events
+
+products:
+  commands:
+    topic:
+      name: products-commands
+  events:
+    topic:
+      name: products-events
+
+payments:
+  commands:
+    topic:
+      name: payments-commands
+  events:
+    topic:
+      name: payments-events
 
 order:
   commands:

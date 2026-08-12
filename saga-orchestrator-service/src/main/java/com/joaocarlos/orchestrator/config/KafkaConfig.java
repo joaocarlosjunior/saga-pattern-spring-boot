@@ -1,4 +1,4 @@
-package com.joaocarlos.orders.config;
+package com.joaocarlos.orchestrator.config;
 
 import org.apache.kafka.clients.admin.NewTopic;
 import org.springframework.beans.factory.annotation.Value;
@@ -8,17 +8,32 @@ import org.springframework.kafka.config.TopicBuilder;
 
 @Configuration
 public class KafkaConfig {
-    @Value("${orders.events.topic.name}")
-    private String ordersEventsTopicName;
+
+    @Value("${products.commands.topic.name}")
+    private String productsCommandsTopicName;
+
+    @Value("${payments.commands.topic.name}")
+    private String paymentsCommandsTopicName;
+
     @Value("${order.commands.topic.name}")
     private String orderCommandsTopicName;
-    private final static Integer TOPIC_REPLICATION_FACTOR = 3;
-    private final static Integer TOPIC_PARTITIONS = 3;
+
+    private static final Integer TOPIC_REPLICATION_FACTOR = 3;
+    private static final Integer TOPIC_PARTITIONS = 3;
 
     @Bean
-    NewTopic createdOrdersEventsTopic() {
+    NewTopic createdProductsCommandsTopic() {
         return TopicBuilder
-                .name(ordersEventsTopicName)
+                .name(productsCommandsTopicName)
+                .partitions(TOPIC_PARTITIONS)
+                .replicas(TOPIC_REPLICATION_FACTOR)
+                .build();
+    }
+
+    @Bean
+    NewTopic createdPaymentsCommandsTopic() {
+        return TopicBuilder
+                .name(paymentsCommandsTopicName)
                 .partitions(TOPIC_PARTITIONS)
                 .replicas(TOPIC_REPLICATION_FACTOR)
                 .build();
@@ -32,5 +47,4 @@ public class KafkaConfig {
                 .replicas(TOPIC_REPLICATION_FACTOR)
                 .build();
     }
-
 }
