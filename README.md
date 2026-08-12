@@ -6,7 +6,7 @@ Este repositório é um projeto de estudo prático para explorar a implementaç�
 
 ---
 
-<img width="772" height="704" alt="Image" src="https://github.com/user-attachments/assets/c74563a7-cd0c-40ae-8902-10fddd451a25" />
+<img width="1101" height="639" alt="Image" src="https://github.com/user-attachments/assets/e2e5aec8-8423-4bc1-865d-a422da678005" />
 
 ## 📖 O Padrão Saga
 
