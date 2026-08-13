@@ -5,6 +5,8 @@ import com.joaocarlos.core.dto.events.OrderCreatedEvent;
 import com.joaocarlos.core.types.OrderStatus;
 import com.joaocarlos.orders.dao.jpa.entity.OrderEntity;
 import com.joaocarlos.orders.dao.jpa.repository.OrderRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
@@ -15,6 +17,8 @@ import java.util.UUID;
 
 @Service
 public class OrderServiceImpl implements OrderService {
+    private static final Logger LOGGER = LoggerFactory.getLogger(OrderServiceImpl.class);
+
     private final OrderRepository orderRepository;
     private final KafkaTemplate<String, Object> kafkaTemplate;
     private final String ordersEventsTopicName;
@@ -32,12 +36,15 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     public Order placeOrder(Order order) {
+        LOGGER.info("Placing new order for customerId: {}, productId: {}, quantity: {}",
+                order.getCustomerId(), order.getProductId(), order.getProductQuantity());
         OrderEntity entity = new OrderEntity();
         entity.setCustomerId(order.getCustomerId());
         entity.setProductId(order.getProductId());
         entity.setProductQuantity(order.getProductQuantity());
         entity.setStatus(OrderStatus.CREATED);
         orderRepository.save(entity);
+        LOGGER.info("Saved OrderEntity with id: {} and status: {}", entity.getId(), entity.getStatus());
 
         orderHistoryService.add(entity.getId(), OrderStatus.CREATED);
 
@@ -49,6 +56,7 @@ public class OrderServiceImpl implements OrderService {
         );
 
         kafkaTemplate.send(this.ordersEventsTopicName, orderCreatedEvent);
+        LOGGER.info("Published OrderCreatedEvent to topic '{}' for orderId: {}", this.ordersEventsTopicName, entity.getId());
 
         return new Order(
                 entity.getId(),
@@ -60,6 +68,7 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     public void approveOrder(UUID orderId) {
+        LOGGER.info("Approving order with orderId: {}", orderId);
         OrderEntity orderEntity = orderRepository.findById(orderId).orElse(null);
         Assert.notNull(orderEntity, "Nenhum pedido encontrado com id: " + orderId);
 
@@ -72,10 +81,12 @@ public class OrderServiceImpl implements OrderService {
         OrderApprovedEvent orderApprovedEvent = new OrderApprovedEvent(orderId);
 
         kafkaTemplate.send(ordersEventsTopicName, orderApprovedEvent);
+        LOGGER.info("Order with orderId: {} successfully APPROVED and OrderApprovedEvent published.", orderId);
     }
 
     @Override
     public void rejectOrder(UUID orderId) {
+        LOGGER.info("Rejecting order with orderId: {}", orderId);
         OrderEntity orderEntity = orderRepository.findById(orderId).orElse(null);
         Assert.notNull(orderEntity, "Nenhum pedido encontrado com id: " + orderId);
 
@@ -84,6 +95,7 @@ public class OrderServiceImpl implements OrderService {
         orderRepository.save(orderEntity);
 
         orderHistoryService.add(orderId, OrderStatus.REJECTED);
+        LOGGER.info("Order with orderId: {} REJECTED.", orderId);
     }
 
 }

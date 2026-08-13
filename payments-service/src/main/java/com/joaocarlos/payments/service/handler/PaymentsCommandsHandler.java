@@ -33,6 +33,9 @@ public class PaymentsCommandsHandler {
 
     @KafkaHandler
     public void handleCommand(@Payload ProcessPaymentCommand processPaymentCommand) {
+        logger.info("Received ProcessPaymentCommand for orderId: {}, productId: {}, price: {}, quantity: {}",
+                processPaymentCommand.getOrderId(), processPaymentCommand.getProductId(),
+                processPaymentCommand.getProductPrice(), processPaymentCommand.getProductQuantity());
         try {
             Payment payment = new Payment(processPaymentCommand.getOrderId(), processPaymentCommand.getProductId(), processPaymentCommand.getProductPrice(), processPaymentCommand.getProductQuantity());
 
@@ -44,8 +47,10 @@ public class PaymentsCommandsHandler {
             );
 
             kafkaTemplate.send(paymentsEventsTopicName, paymentProcessedEvent);
+            logger.info("Published PaymentProcessedEvent for orderId: {}, paymentId: {}",
+                    processedPayment.getOrderId(), processedPayment.getId());
         } catch (CreditCardProcessorUnavailableException e) {
-            logger.error(e.getLocalizedMessage(), e);
+            logger.error("Payment failed for orderId: {}: {}", processPaymentCommand.getOrderId(), e.getLocalizedMessage(), e);
             PaymentFailedEvent paymentFailedEvent = new PaymentFailedEvent(
                     processPaymentCommand.getOrderId(),
                     processPaymentCommand.getProductId(),
@@ -53,6 +58,7 @@ public class PaymentsCommandsHandler {
             );
 
             kafkaTemplate.send(paymentsEventsTopicName, paymentFailedEvent);
+            logger.info("Published PaymentFailedEvent for orderId: {}", processPaymentCommand.getOrderId());
         }
     }
 }

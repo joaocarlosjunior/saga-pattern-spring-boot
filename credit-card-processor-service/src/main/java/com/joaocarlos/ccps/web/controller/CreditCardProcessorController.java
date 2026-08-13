@@ -15,6 +15,7 @@ public class CreditCardProcessorController {
     @PostMapping("/process")
     @ResponseStatus(HttpStatus.ACCEPTED)
     public void processCreditCard(@RequestBody @Valid CreditCardProcessRequest request) {
-        LOGGER.info("Processing request: {}", request);
+        LOGGER.info("REST request to process credit card payment for amount: {}", request.getPaymentAmount());
+        LOGGER.info("Credit card payment processing accepted for amount: {}", request.getPaymentAmount());
     }
 }

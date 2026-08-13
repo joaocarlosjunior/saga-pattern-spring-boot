@@ -38,6 +38,8 @@ public class ProductCommandsHandler {
 
     @KafkaHandler
     public void handleCommand(@Payload ReserveProductCommand reserveProductCommand) {
+        logger.info("Received ReserveProductCommand for orderId: {}, productId: {}, quantity: {}",
+                reserveProductCommand.getOrderId(), reserveProductCommand.getProductId(), reserveProductCommand.getProductQuantity());
         try {
             Product product = new Product(reserveProductCommand.getProductId(), reserveProductCommand.getProductQuantity());
             Product reservedProduct = productService.reserve(product, reserveProductCommand.getOrderId());
@@ -50,19 +52,23 @@ public class ProductCommandsHandler {
             );
 
             kafkaTemplate.send(productEventsTopicName, productReservedEvent);
+            logger.info("Published ProductReservedEvent for orderId: {}", reserveProductCommand.getOrderId());
         } catch (Exception e) {
-            logger.error(e.getLocalizedMessage(), e);
+            logger.error("Failed to reserve product for orderId: {}: {}", reserveProductCommand.getOrderId(), e.getLocalizedMessage(), e);
             ProductReservationFailedEvent productReservationFailedEvent = new ProductReservationFailedEvent(
                     reserveProductCommand.getOrderId(),
                     reserveProductCommand.getProductId(),
                     reserveProductCommand.getProductQuantity()
             );
             kafkaTemplate.send(productEventsTopicName, productReservationFailedEvent);
+            logger.info("Published ProductReservationFailedEvent for orderId: {}", reserveProductCommand.getOrderId());
         }
     }
 
     @KafkaHandler
     public void handleCommand(@Payload CancelProductReservationCommand cancelProductReservationCommand) {
+        logger.info("Received CancelProductReservationCommand for orderId: {}, productId: {}, quantity: {}",
+                cancelProductReservationCommand.getOrderId(), cancelProductReservationCommand.getProductId(), cancelProductReservationCommand.getProductQuantity());
         Product productToCancel = new Product(
                 cancelProductReservationCommand.getProductId(),
                 cancelProductReservationCommand.getProductQuantity()
@@ -76,5 +82,6 @@ public class ProductCommandsHandler {
         );
 
         kafkaTemplate.send(productEventsTopicName, event);
+        logger.info("Published ProductReservationCancelledEvent for orderId: {}", cancelProductReservationCommand.getOrderId());
     }
 }
