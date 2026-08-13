@@ -149,7 +149,7 @@ sequenceDiagram
 ## 🛠️ Tecnologias Utilizadas
 
 - **Java 17**
-- **Spring Boot 3.5.x**
+- **Spring Boot 4.1.0**
 - **Apache Kafka** (Cluster com 3 brokers configurado via KRaft)
 - **Spring Kafka** (Integração assíncrona baseada em eventos/comandos)
 - **H2 Database** (Persistência local relacional em memória para fins de estudo)
