@@ -46,6 +46,39 @@ O projeto é estruturado como um monorepo Maven composto pelos seguintes módulo
 
 ---
 
+## 📐 Padrões de Arquitetura Implementados (Design Patterns)
+
+Esta aplicação utiliza um conjunto de padrões de arquitetura para sistemas distribuídos e microsserviços para garantir alta disponibilidade, consistência de dados, rastreabilidade e resiliência:
+
+### 1. 🎼 Saga Orchestration Pattern (Orquestração de Sagas)
+- **O que é**: Divide transações de negócios distribuídas em passos locais executados por diferentes microsserviços sob o comando de um coordenador centralizado.
+- **Como está implementado**: O serviço `saga-orchestrator-service` possui a classe `SagaOrchestrator.java`, que escuta eventos nos tópicos do Kafka e toma decisões sobre qual próximo comando enviar (ex: enviar `ReserveProductCommand` ao receber `OrderCreatedEvent`). Em caso de falhas em qualquer ponto da cadeia, o orquestrador coordena o disparo das ações compensatórias.
+
+### 2. 📦 Transactional Outbox Pattern (Outbox Transacional)
+- **O que é**: Evita o problema de **Dual Write** (escrever no banco de dados e enviar mensagem para o Kafka na mesma requisição, arriscando inconsistências se a rede ou o broker falharem).
+- **Como está implementado**: Descentralizado em cada microsserviço (`orders-service`, `products-service`, `payments-service` e `saga-orchestrator-service`). Durante a mesma transação `@Transactional` que altera os dados de negócio, a mensagem a ser enviada ao Kafka é salva na tabela local `outbox` com o status `PENDING`. Um poller assíncrono `@Scheduled` (`OutboxPublisherScheduler`) lê os registros pendentes, envia para o Kafka e atualiza o status para `PROCESSED`. Um segundo agendador (`OutboxCleanerScheduler`) purga registros processados antigos após 7 dias.
+
+### 3. 🔄 Compensating Transaction Pattern (Transação Compensatória)
+- **O que é**: Como transações ACID distribuídas (2PC) não são utilizadas em microsserviços de alta performance, este padrão desfaz logicamente os efeitos de transações anteriores caso uma etapa posterior da saga falhe.
+- **Como está implementado**: Se o pagamento falhar no `payments-service`, o `SagaOrchestrator` publica o comando `CancelProductReservationCommand` no tópico `products-commands`. O `products-service` escuta o comando e devolve a quantidade reservada de volta ao estoque do produto. Em seguida, envia `RejectOrderCommand` para alterar o estado do pedido no `orders-service` para `REJECTED`.
+
+### 4. 🔍 Distributed Tracing & W3C Context Propagation Pattern (Propagação de Contexto)
+- **O que é**: Mantém a continuidade da árvore de Spans em sistemas assíncronos e orientados a eventos, permitindo visualizar a jornada completa da requisição no **Grafana Tempo**.
+- **Como está implementado**:
+  - **No momento do salvamento do Outbox**: O `OutboxServiceImpl` captura o cabeçalho W3C `traceparent` ativo da requisição usando OpenTelemetry API (`Context.current()`) e salva na coluna `trace_parent` da tabela `outbox`.
+  - **No envio ao Kafka**: O `OutboxPublisherScheduler` extrai a string `traceParent`, reconstrói o contexto pai, cria um Span de publicação (`outbox_publish`) e injeta a chave `traceparent` nos `Record Headers` do Kafka.
+  - **No consumo**: Os listeners do Kafka extraem o `traceparent` dos cabeçalhos das mensagens e mantêm o trace distribuído unificado e sem quebras no Grafana.
+
+### 5. 🗄️ Database per Service Pattern (Banco de Dados por Serviço)
+- **O que é**: Garante o acoplamento fraco e a autonomia de cada microsserviço, que mantém seu próprio banco de dados privado inacessível por outros serviços.
+- **Como está implementado**: Cada microsserviço possui seu próprio banco de dados H2 isolado em memória (`jdbc:h2:mem:testdb`), acessível unicamente pelo próprio serviço. A comunicação entre serviços é feita exclusivamente via mensagens assíncronas no Kafka ou chamadas de API (como a integração REST HTTP do `payments-service` com o `credit-card-processor-service`).
+
+---
+
+
+
+---
+
 ## 🔄 Fluxos da Saga
 
 ### 1. Caminho Feliz (Sucesso Completo)
@@ -173,17 +206,12 @@ docker-compose up -d
 ```
 Certifique-se de que os containers `kafka-1`, `kafka-2` e `kafka-3` estejam ativos e saudáveis.
 
-### Passo 2: Compilar e Instalar o Módulo `core`
-Como o módulo `core` é uma biblioteca local que contém DTOs compartilhados, e não está listado no bloco de `<modules>` no `pom.xml` pai, você precisa compilá-lo e instalá-lo no repositório Maven local antes dos outros serviços:
-```bash
-mvn clean install -f core/pom.xml
-```
-
-### Passo 3: Compilar o Restante dos Microsserviços
-A partir da raiz do projeto, execute a build geral:
+### Passo 2: Compilar e Instalar os Módulos
+A partir da raiz do projeto, execute o comando abaixo para compilar e rodar os testes de todos os 7 módulos do reator Maven (incluindo `core`):
 ```bash
 mvn clean install
 ```
+
 
 ### Passo 4: Inicializar as Aplicações
 Execute cada microsserviço em terminais separados utilizando o plugin do Spring Boot.
@@ -273,13 +301,15 @@ O pedido começará como `CREATED`, tentará processar o pagamento, falhará por
 
 ---
 
-## 🛢️ Console H2 (Bancos de Dados Locais)
-Você pode inspecionar o estado dos dados em tempo real acessando os consoles H2 de cada microsserviço:
+## 🛢️ Console H2 (Bancos de Dados Locais & Tabela Outbox)
+Você pode inspecionar a tabela de negócios e a tabela `outbox` em tempo real acessando os consoles H2 de cada microsserviço:
 - **Orders Service Database**: [http://localhost:8080/h2-console](http://localhost:8080/h2-console)
 - **Products Service Database**: [http://localhost:8081/h2-console](http://localhost:8081/h2-console)
 - **Payments Service Database**: [http://localhost:8082/h2-console](http://localhost:8082/h2-console)
+- **Saga Orchestrator Service Database**: [http://localhost:8083/h2-console](http://localhost:8083/h2-console)
 
 **Credenciais de Acesso:**
 - **JDBC URL**: `jdbc:h2:mem:testdb`
 - **User**: `sa`
 - **Password**: `password`
+
