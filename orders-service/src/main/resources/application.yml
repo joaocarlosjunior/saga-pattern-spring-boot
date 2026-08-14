@@ -43,6 +43,15 @@ orders:
   events:
     topic:
       name: orders-events
+  outbox:
+    retention-days: 7
+    publisher:
+      fixed-delay-ms: 5000
+      batch-size: 50
+      max-retries: 3
+    cleaner:
+      cron: "0 0 3 * * *"
+
 
 order:
   commands:

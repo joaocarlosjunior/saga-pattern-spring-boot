@@ -34,6 +34,14 @@ spring:
       observation-enabled: true
     template:
       observation-enabled: true
+  datasource:
+    url: jdbc:h2:mem:testdb
+    username: sa
+    password: password
+    driver-class-name: org.h2.Driver
+  h2:
+    console:
+      enabled: true
 
 remote:
   ccp:
@@ -46,6 +54,15 @@ payments:
   events:
     topic:
       name: payments-events
+  outbox:
+    retention-days: 7
+    publisher:
+      fixed-delay-ms: 5000
+      batch-size: 50
+      max-retries: 3
+    cleaner:
+      cron: "0 0 3 * * *"
+
 
 management:
   otlp:

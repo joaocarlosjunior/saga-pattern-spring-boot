@@ -1,17 +1,18 @@
 package com.joaocarlos.orders.service;
 
 import com.joaocarlos.core.dto.Order;
+import com.joaocarlos.core.dto.events.OrderApprovedEvent;
 import com.joaocarlos.core.dto.events.OrderCreatedEvent;
 import com.joaocarlos.core.types.OrderStatus;
 import com.joaocarlos.orders.dao.jpa.entity.OrderEntity;
 import com.joaocarlos.orders.dao.jpa.repository.OrderRepository;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.Assert;
-import com.joaocarlos.core.dto.events.OrderApprovedEvent;
 
 import java.util.UUID;
 
@@ -20,21 +21,22 @@ public class OrderServiceImpl implements OrderService {
     private static final Logger LOGGER = LoggerFactory.getLogger(OrderServiceImpl.class);
 
     private final OrderRepository orderRepository;
-    private final KafkaTemplate<String, Object> kafkaTemplate;
+    private final OutboxService outboxService;
     private final String ordersEventsTopicName;
     private final OrderHistoryService orderHistoryService;
 
     public OrderServiceImpl(OrderRepository orderRepository,
-                            KafkaTemplate<String, Object> kafkaTemplate,
+                            OutboxService outboxService,
                             @Value("${orders.events.topic.name}") String ordersEventsTopicName,
                             OrderHistoryService orderHistoryService) {
         this.orderRepository = orderRepository;
-        this.kafkaTemplate = kafkaTemplate;
+        this.outboxService = outboxService;
         this.ordersEventsTopicName = ordersEventsTopicName;
         this.orderHistoryService = orderHistoryService;
     }
 
     @Override
+    @Transactional
     public Order placeOrder(Order order) {
         LOGGER.info("Placing new order for customerId: {}, productId: {}, quantity: {}",
                 order.getCustomerId(), order.getProductId(), order.getProductQuantity());
@@ -55,8 +57,8 @@ public class OrderServiceImpl implements OrderService {
                 entity.getProductQuantity()
         );
 
-        kafkaTemplate.send(this.ordersEventsTopicName, orderCreatedEvent);
-        LOGGER.info("Published OrderCreatedEvent to topic '{}' for orderId: {}", this.ordersEventsTopicName, entity.getId());
+        outboxService.publishEvent("ORDER", entity.getId().toString(), OrderCreatedEvent.class.getName(), this.ordersEventsTopicName, orderCreatedEvent);
+        LOGGER.info("Saved OrderCreatedEvent to Outbox for orderId: {}", entity.getId());
 
         return new Order(
                 entity.getId(),
@@ -67,6 +69,7 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
+    @Transactional
     public void approveOrder(UUID orderId) {
         LOGGER.info("Approving order with orderId: {}", orderId);
         OrderEntity orderEntity = orderRepository.findById(orderId).orElse(null);
@@ -80,11 +83,12 @@ public class OrderServiceImpl implements OrderService {
 
         OrderApprovedEvent orderApprovedEvent = new OrderApprovedEvent(orderId);
 
-        kafkaTemplate.send(ordersEventsTopicName, orderApprovedEvent);
-        LOGGER.info("Order with orderId: {} successfully APPROVED and OrderApprovedEvent published.", orderId);
+        outboxService.publishEvent("ORDER", orderId.toString(), OrderApprovedEvent.class.getName(), ordersEventsTopicName, orderApprovedEvent);
+        LOGGER.info("Order with orderId: {} successfully APPROVED and OrderApprovedEvent saved to Outbox.", orderId);
     }
 
     @Override
+    @Transactional
     public void rejectOrder(UUID orderId) {
         LOGGER.info("Rejecting order with orderId: {}", orderId);
         OrderEntity orderEntity = orderRepository.findById(orderId).orElse(null);

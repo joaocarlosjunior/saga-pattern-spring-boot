@@ -17,12 +17,14 @@
     </parent>
 
     <modules>
+        <module>core</module>
         <module>orders-service</module>
         <module>products-service</module>
         <module>payments-service</module>
         <module>credit-card-processor-service</module>
         <module>saga-orchestrator-service</module>
     </modules>
+
 
     <properties>
         <revision>1.0.0</revision>
